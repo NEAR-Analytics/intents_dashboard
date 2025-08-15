@@ -14,10 +14,9 @@ WORKDIR /app
 # Install dependencies first (better caching)
 COPY pyproject.toml uv.lock ./
 
-# Create a local project venv and install locked deps
+# Create a local project venv and install locked deps (no BuildKit mounts)
 ENV UV_PROJECT_ENVIRONMENT=/app/.venv
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev
+RUN uv sync --frozen --no-dev
 
 # Copy application code
 COPY . .
