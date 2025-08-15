@@ -1,0 +1,1112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEAR Intents Fee Collection Dashboard - app-fee.near</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/highcharts.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/modules/annotations.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/modules/exporting.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #1D4E89 0%, #00B2CA 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #1D4E89 0%, #00B2CA 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            margin: 0 0 10px 0;
+            font-size: 2.5rem;
+            font-weight: 700;
+        }
+        
+        .header p {
+            margin: 0;
+            font-size: 1.2rem;
+            opacity: 0.95;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            padding: 30px;
+            background: #f8fafc;
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border-top: 3px solid #00B2CA;
+        }
+        
+        .stat-card h4 {
+            margin: 0 0 10px 0;
+            color: #64748b;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .stat-card .value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #1D4E89;
+        }
+        
+        .stat-card .sub-value {
+            font-size: 0.9rem;
+            color: #94a3b8;
+            margin-top: 5px;
+        }
+        
+        .charts-section {
+            padding: 30px;
+        }
+        
+        .chart-container {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            min-height: 500px;
+        }
+        
+        .insights {
+            padding: 30px;
+            background: #f8fafc;
+            border-top: 1px solid #e2e8f0;
+        }
+        
+        .insight-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border-left: 4px solid #7DCFB6;
+        }
+        
+        .insight-card h3 {
+            margin: 0 0 10px 0;
+            color: #1D4E89;
+            font-size: 1.3rem;
+        }
+        
+        .insight-card p {
+            margin: 0;
+            color: #64748b;
+            line-height: 1.6;
+        }
+        
+        .metric {
+            display: inline-block;
+            background: #7DCFB6;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin: 0 4px;
+        }
+        
+        .metric.orange { background: #F79256; }
+        .metric.blue { background: #00B2CA; }
+        .metric.navy { background: #1D4E89; }
+        .metric.peach { background: #FBD1A2; color: #1D4E89; }
+        
+        .insight-card.primary { border-left-color: #7DCFB6; }
+        .insight-card.secondary { border-left-color: #00B2CA; }
+        .insight-card.tertiary { border-left-color: #F79256; }
+        
+        .top-assets-table {
+            padding: 30px;
+            background: white;
+        }
+        
+        .top-assets-table h2 {
+            color: #1D4E89;
+            margin-bottom: 20px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th {
+            background: #f8fafc;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #64748b;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        
+        tr:hover {
+            background: #f8fafc;
+        }
+        
+        .sql-toggle {
+            margin-top: 20px;
+            text-align: center;
+        }
+        
+        .sql-button {
+            background: #1D4E89;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+        
+        .sql-button:hover {
+            background: #00B2CA;
+        }
+        
+        .sql-content {
+            display: none;
+            margin-top: 20px;
+            background: #1e293b;
+            color: #cbd5e1;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            overflow-x: auto;
+        }
+        
+        .chart-toggle {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+            gap: 10px;
+        }
+        
+        .toggle-button {
+            background: #f8fafc;
+            color: #64748b;
+            border: 2px solid #e2e8f0;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+        
+        .toggle-button:hover {
+            background: #e2e8f0;
+            color: #475569;
+        }
+        
+        .toggle-button.active {
+            background: #1D4E89;
+            color: white;
+            border-color: #1D4E89;
+        }
+        
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .chart-title {
+            flex: 1;
+            min-width: 300px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- HEADER SECTION -->
+        <div class="header">
+            <h1>💰 NEAR Intents Fee Collection Dashboard</h1>
+            <p>Account: app-fee.near | Real-time Multichain Fee Analytics</p>
+        </div>
+        
+        <!-- SUMMARY STATS -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h4>Total Fees Collected (USD)</h4>
+                <div class="value">$11,104.15</div>
+                <div class="sub-value">All-time total</div>
+            </div>
+            <div class="stat-card">
+                <h4>Total Transactions</h4>
+                <div class="value">1,443</div>
+                <div class="sub-value">Fee collections</div>
+            </div>
+            <div class="stat-card">
+                <h4>Unique Assets</h4>
+                <div class="value">35+</div>
+                <div class="sub-value">Different tokens</div>
+            </div>
+            <div class="stat-card">
+                <h4>Source Blockchains</h4>
+                <div class="value">15</div>
+                <div class="sub-value">Chains integrated</div>
+            </div>
+            <div class="stat-card">
+                <h4>Today's Fees</h4>
+                <div class="value">$798.41</div>
+                <div class="sub-value">Aug 14, 2025</div>
+            </div>
+            <div class="stat-card">
+                <h4>Top Asset</h4>
+                <div class="value">ETH</div>
+                <div class="sub-value">$3,711.28 collected</div>
+            </div>
+        </div>
+        
+        <!-- CHARTS SECTION -->
+        <div class="charts-section">
+            <!-- Daily USD Fees Chart with Asset Breakdown -->
+            <div class="chart-container">
+                <div class="chart-header">
+                    <div class="chart-title">
+                        <h3>Daily Fee Collection</h3>
+                    </div>
+                    <div class="chart-toggle">
+                        <button class="toggle-button active" onclick="toggleChartView('dailyUSDChart', 'asset')">Asset Breakdown</button>
+                        <button class="toggle-button" onclick="toggleChartView('dailyUSDChart', 'blockchain')">Source Blockchain</button>
+                    </div>
+                </div>
+                <div id="dailyUSDChart" style="height: 500px;"></div>
+            </div>
+            
+            <!-- Cumulative USD Fees Chart with Asset Breakdown -->
+            <div class="chart-container">
+                <div class="chart-header">
+                    <div class="chart-title">
+                        <h3>Cumulative Fee Collection</h3>
+                    </div>
+                    <div class="chart-toggle">
+                        <button class="toggle-button active" onclick="toggleChartView('cumulativeChart', 'asset')">Asset Breakdown</button>
+                        <button class="toggle-button" onclick="toggleChartView('cumulativeChart', 'blockchain')">Source Blockchain</button>
+                    </div>
+                </div>
+                <div id="cumulativeChart" style="height: 500px;"></div>
+            </div>
+            
+            <!-- Asset Distribution Horizontal Bar Chart -->
+            <div class="chart-container">
+                <div class="chart-header">
+                    <div class="chart-title">
+                        <h3>Fee Distribution</h3>
+                    </div>
+                    <div class="chart-toggle">
+                        <button class="toggle-button active" onclick="toggleChartView('assetBarChart', 'asset')">Asset Breakdown</button>
+                        <button class="toggle-button" onclick="toggleChartView('assetBarChart', 'blockchain')">Source Blockchain</button>
+                    </div>
+                </div>
+                <div id="assetBarChart" style="height: 500px;"></div>
+            </div>
+            
+            <!-- Top Assets by Day Chart -->
+            <div class="chart-container">
+                <div class="chart-header">
+                    <div class="chart-title">
+                        <h3>Top Performers Over Time</h3>
+                    </div>
+                    <div class="chart-toggle">
+                        <button class="toggle-button active" onclick="toggleChartView('topAssetsTimeChart', 'asset')">Asset Breakdown</button>
+                        <button class="toggle-button" onclick="toggleChartView('topAssetsTimeChart', 'blockchain')">Source Blockchain</button>
+                    </div>
+                </div>
+                <div id="topAssetsTimeChart" style="height: 500px;"></div>
+            </div>
+        </div>
+        
+        <!-- TOP ASSETS TABLE -->
+        <div class="top-assets-table">
+            <h2>Top 10 Assets by Total Fees Collected</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Asset</th>
+                        <th>Total USD</th>
+                        <th>Total Tokens</th>
+                        <th>Transactions</th>
+                        <th>Source Chains</th>
+                        <th>% of Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>ETH</td>
+                        <td>$3,711.28</td>
+                        <td>0.9820</td>
+                        <td>228</td>
+                        <td>4</td>
+                        <td>33.4%</td>
+                    </tr>
+                    <tr>
+                        <td>ZEC (Zcash)</td>
+                        <td>$2,009.12</td>
+                        <td>51.5747</td>
+                        <td>171</td>
+                        <td>1</td>
+                        <td>18.1%</td>
+                    </tr>
+                    <tr>
+                        <td>BTC</td>
+                        <td>$1,181.49</td>
+                        <td>0.0101</td>
+                        <td>120</td>
+                        <td>2</td>
+                        <td>10.6%</td>
+                    </tr>
+                    <tr>
+                        <td>USDC</td>
+                        <td>$662.91</td>
+                        <td>663.0463</td>
+                        <td>254</td>
+                        <td>6</td>
+                        <td>6.0%</td>
+                    </tr>
+                    <tr>
+                        <td>USDT</td>
+                        <td>$538.90</td>
+                        <td>538.9130</td>
+                        <td>121</td>
+                        <td>5</td>
+                        <td>4.9%</td>
+                    </tr>
+                    <tr>
+                        <td>wNEAR</td>
+                        <td>$365.08</td>
+                        <td>132.8413</td>
+                        <td>250</td>
+                        <td>1</td>
+                        <td>3.3%</td>
+                    </tr>
+                    <tr>
+                        <td>DOGE</td>
+                        <td>$270.45</td>
+                        <td>1,267.9605</td>
+                        <td>14</td>
+                        <td>1</td>
+                        <td>2.4%</td>
+                    </tr>
+                    <tr>
+                        <td>DAI</td>
+                        <td>$202.98</td>
+                        <td>203.0405</td>
+                        <td>16</td>
+                        <td>1</td>
+                        <td>1.8%</td>
+                    </tr>
+                    <tr>
+                        <td>RHEA</td>
+                        <td>$66.68</td>
+                        <td>849.0781</td>
+                        <td>22</td>
+                        <td>1</td>
+                        <td>0.6%</td>
+                    </tr>
+                    <tr>
+                        <td>SOL</td>
+                        <td>$28.99</td>
+                        <td>0.1539</td>
+                        <td>85</td>
+                        <td>1</td>
+                        <td>0.3%</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- INSIGHTS SECTION -->
+        <div class="insights">
+            <div class="insight-card primary">
+                <h3>🚀 Rapid Growth Trajectory</h3>
+                <p>The app-fee.near account has collected <span class="metric navy">$11,104.15</span> in total fees since its inception on <span class="metric blue">August 1, 2025</span>. With just 14 days of operation, this represents an impressive <span class="metric orange">$793/day</span> average fee collection rate, demonstrating strong protocol usage and healthy fee generation.</p>
+            </div>
+            
+            <div class="insight-card secondary">
+                <h3>💎 Diversified Fee Portfolio</h3>
+                <p>Fees are collected across <span class="metric navy">35+ different assets</span> from <span class="metric">15 blockchains</span>. The top 3 assets (ETH, ZEC, BTC) account for <span class="metric orange">62.1%</span> of total fees, while stablecoins (USDC, USDT, DAI) contribute <span class="metric blue">12.7%</span>, providing both growth potential and stability.</p>
+            </div>
+            
+            <div class="insight-card tertiary">
+                <h3>🌐 True Multichain Operations</h3>
+                <p>NEAR Intents demonstrates exceptional cross-chain capabilities, processing fees from Ethereum, Bitcoin, Zcash, Solana, Arbitrum, Base, Tron, and 8 other chains. The account has processed <span class="metric">1,443 transactions</span> with <span class="metric orange">103 transactions per day</span> on average, showcasing high throughput and user activity.</p>
+            </div>
+            
+            <div class="sql-toggle">
+                <button class="sql-button" onclick="toggleSQL()">Show/Hide SQL Query</button>
+                <div id="sqlContent" class="sql-content">
+-- NEAR Intents Fee Collection Analysis for app-fee.near
+-- This query retrieves all fee collection data from the NEAR.DEFI.EZ_INTENTS table
+
+-- Daily fee aggregation with cumulative totals
+WITH daily_fees AS (
+  SELECT 
+    DATE_TRUNC('day', block_timestamp) as date,
+    COALESCE(symbol, contract_address) as asset,
+    blockchain as source_chain,
+    SUM(COALESCE(amount_adj, 0)) as daily_token_amount,
+    SUM(COALESCE(amount_usd, 0)) as daily_usd_amount,
+    COUNT(*) as transaction_count
+  FROM NEAR.DEFI.EZ_INTENTS 
+  WHERE new_owner_id = 'app-fee.near'
+    AND block_timestamp >= '2025-01-01'
+  GROUP BY 1, 2, 3
+),
+cumulative_fees AS (
+  SELECT 
+    date,
+    asset,
+    source_chain,
+    daily_token_amount,
+    daily_usd_amount,
+    transaction_count,
+    SUM(daily_token_amount) OVER (PARTITION BY asset ORDER BY date) as cumulative_token_amount,
+    SUM(daily_usd_amount) OVER (PARTITION BY asset ORDER BY date) as cumulative_usd_amount
+  FROM daily_fees
+)
+SELECT 
+  date,
+  asset,
+  source_chain,
+  ROUND(daily_token_amount, 6) as daily_token_amount,
+  ROUND(daily_usd_amount, 2) as daily_usd_amount,
+  ROUND(cumulative_token_amount, 6) as cumulative_token_amount,
+  ROUND(cumulative_usd_amount, 2) as cumulative_usd_amount,
+  transaction_count
+FROM cumulative_fees
+WHERE daily_usd_amount > 0 OR cumulative_usd_amount > 0
+ORDER BY date DESC, daily_usd_amount DESC;
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Toggle SQL display
+        function toggleSQL() {
+            const sqlContent = document.getElementById('sqlContent');
+            sqlContent.style.display = sqlContent.style.display === 'none' ? 'block' : 'none';
+        }
+
+        // Color palette from coolors.co
+        const colors = {
+            orange: '#F79256',
+            peach: '#FBD1A2',
+            mint: '#7DCFB6',
+            cyan: '#00B2CA',
+            navy: '#1D4E89'
+        };
+
+        // Extended color palette for multiple series
+        const seriesColors = [
+            colors.navy,    // ETH
+            colors.orange,  // ZEC
+            colors.cyan,    // BTC
+            colors.mint,    // USDC
+            colors.peach,   // Others
+            '#B08EA2',      // Additional colors
+            '#C5D86D',
+            '#A23E48',
+            '#6C464E',
+            '#9E7682'
+        ];
+
+        // Blockchain-specific colors
+        const blockchainColors = [
+            '#627EEA',      // Ethereum (blue)
+            '#F7931A',      // Bitcoin (orange)
+            '#F4B728',      // Zcash (yellow)
+            '#14F195',      // Solana (green)
+            '#2D3748',      // Arbitrum (dark gray)
+            '#0052FF',      // Base (blue)
+            '#FF008C',      // Tron (pink)
+            '#8247E5',      // Polygon (purple)
+            '#94A3B8'       // Others (light gray)
+        ];
+
+        // Data for stacked daily chart
+        const dailyStackedData = {
+            dates: ['2025-08-01', '2025-08-02', '2025-08-03', '2025-08-04', '2025-08-05', 
+                    '2025-08-06', '2025-08-07', '2025-08-08', '2025-08-09', '2025-08-10',
+                    '2025-08-11', '2025-08-12', '2025-08-13', '2025-08-14'],
+            ETH: [0, 354.68, 1357.73, 183.87, 376.96, 11.62, 11.52, 103.84, 272.34, 214.93, 8.02, 441.10, 41.45, 333.51],
+            ZEC: [20.89, 13.03, 0.36, 78.07, 7.56, 6.69, 48.47, 89.14, 15.35, 23.57, 412.86, 230.71, 884.47, 177.96],
+            BTC: [0, 66.68, 48.07, 41.31, 258.94, 17.28, 51.83, 267.97, 18.09, 90.99, 38.92, 101.65, 137.21, 42.54],
+            USDC: [25.14, 2.8, 13.83, 60.95, 101.64, 81.17, 8.33, 52.94, 10.24, 22.67, 10.51, 117.40, 96.93, 58.36],
+            Others: [28.24, 23.61, 127.68, 485.64, 376.11, 49.21, 77.14, 253.42, 269.41, 191.68, 54.37, 271.42, 409.40, 148.78]
+        };
+
+        // Data for blockchain breakdown
+        const dailyBlockchainData = {
+            dates: ['2025-08-01', '2025-08-02', '2025-08-03', '2025-08-04', '2025-08-05', 
+                    '2025-08-06', '2025-08-07', '2025-08-08', '2025-08-09', '2025-08-10',
+                    '2025-08-11', '2025-08-12', '2025-08-13', '2025-08-14'],
+            Ethereum: [0, 421.36, 1405.80, 244.18, 635.90, 28.90, 63.35, 371.81, 290.43, 237.60, 16.54, 558.50, 138.66, 391.87],
+            Bitcoin: [0, 66.68, 48.07, 41.31, 258.94, 17.28, 51.83, 267.97, 18.09, 90.99, 38.92, 101.65, 137.21, 42.54],
+            Zcash: [20.89, 13.03, 0.36, 78.07, 7.56, 6.69, 48.47, 89.14, 15.35, 23.57, 412.86, 230.71, 884.47, 177.96],
+            Solana: [25.14, 2.8, 13.83, 60.95, 101.64, 81.17, 8.33, 52.94, 10.24, 22.67, 10.51, 117.40, 96.93, 58.36],
+            Others: [28.24, 23.61, 127.68, 485.64, 376.11, 49.21, 77.14, 253.42, 269.41, 191.68, 54.37, 271.42, 409.40, 148.78]
+        };
+
+        // Calculate cumulative data
+        const cumulativeStackedData = {
+            dates: dailyStackedData.dates,
+            ETH: [],
+            ZEC: [],
+            BTC: [],
+            USDC: [],
+            Others: []
+        };
+
+        // Calculate cumulative values
+        let cumETH = 0, cumZEC = 0, cumBTC = 0, cumUSDC = 0, cumOthers = 0;
+        for (let i = 0; i < dailyStackedData.dates.length; i++) {
+            cumETH += dailyStackedData.ETH[i];
+            cumZEC += dailyStackedData.ZEC[i];
+            cumBTC += dailyStackedData.BTC[i];
+            cumUSDC += dailyStackedData.USDC[i];
+            cumOthers += dailyStackedData.Others[i];
+            
+            cumulativeStackedData.ETH.push(cumETH);
+            cumulativeStackedData.ZEC.push(cumZEC);
+            cumulativeStackedData.BTC.push(cumBTC);
+            cumulativeStackedData.USDC.push(cumUSDC);
+            cumulativeStackedData.Others.push(cumOthers);
+        }
+
+        // Calculate cumulative blockchain data
+        const cumulativeBlockchainData = {
+            dates: dailyBlockchainData.dates,
+            Ethereum: [],
+            Bitcoin: [],
+            Zcash: [],
+            Solana: [],
+            Others: []
+        };
+
+        // Calculate cumulative blockchain values
+        let cumEthereum = 0, cumBitcoin = 0, cumZcash = 0, cumSolana = 0, cumOthersChain = 0;
+        for (let i = 0; i < dailyBlockchainData.dates.length; i++) {
+            cumEthereum += dailyBlockchainData.Ethereum[i];
+            cumBitcoin += dailyBlockchainData.Bitcoin[i];
+            cumZcash += dailyBlockchainData.Zcash[i];
+            cumSolana += dailyBlockchainData.Solana[i];
+            cumOthersChain += dailyBlockchainData.Others[i];
+            
+            cumulativeBlockchainData.Ethereum.push(cumEthereum);
+            cumulativeBlockchainData.Bitcoin.push(cumBitcoin);
+            cumulativeBlockchainData.Zcash.push(cumZcash);
+            cumulativeBlockchainData.Solana.push(cumSolana);
+            cumulativeBlockchainData.Others.push(cumOthersChain);
+        }
+
+        // Common chart options
+        const commonOptions = {
+            chart: {
+                backgroundColor: 'transparent',
+                style: {
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                }
+            },
+            credits: {
+                enabled: false
+            },
+            exporting: {
+                enabled: true
+            }
+        };
+
+        // Chart instances for updating
+        let dailyChart, cumulativeChart, assetBarChart, topAssetsChart;
+
+        // Toggle function to switch between asset and blockchain views
+        function toggleChartView(chartId, viewType) {
+            // Update button states
+            const chartContainer = document.getElementById(chartId).closest('.chart-container');
+            const buttons = chartContainer.querySelectorAll('.toggle-button');
+            buttons.forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // Update chart based on view type
+            switch(chartId) {
+                case 'dailyUSDChart':
+                    updateDailyChart(viewType);
+                    break;
+                case 'cumulativeChart':
+                    updateCumulativeChart(viewType);
+                    break;
+                case 'assetBarChart':
+                    updateAssetBarChart(viewType);
+                    break;
+                case 'topAssetsTimeChart':
+                    updateTopAssetsChart(viewType);
+                    break;
+            }
+        }
+
+        // Function to update daily chart
+        function updateDailyChart(viewType) {
+            const data = viewType === 'asset' ? dailyStackedData : dailyBlockchainData;
+            const seriesNames = viewType === 'asset' ? ['ETH', 'ZEC', 'BTC', 'USDC', 'Others'] : ['Ethereum', 'Bitcoin', 'Zcash', 'Solana', 'Others'];
+            const title = viewType === 'asset' ? 'Daily Fee Collection by Asset (USD)' : 'Daily Fee Collection by Source Blockchain (USD)';
+            const subtitle = viewType === 'asset' ? 'Daily fees broken down by top assets' : 'Daily fees broken down by source blockchains';
+            const colorPalette = viewType === 'asset' ? seriesColors : blockchainColors;
+
+            dailyChart.update({
+                title: { text: title },
+                subtitle: { text: subtitle },
+                series: seriesNames.map((name, index) => ({
+                    name: name,
+                    data: data[name],
+                    color: colorPalette[index % colorPalette.length]
+                }))
+            });
+        }
+
+        // Function to update cumulative chart
+        function updateCumulativeChart(viewType) {
+            const data = viewType === 'asset' ? cumulativeStackedData : cumulativeBlockchainData;
+            const seriesNames = viewType === 'asset' ? ['ETH', 'ZEC', 'BTC', 'USDC', 'Others'] : ['Ethereum', 'Bitcoin', 'Zcash', 'Solana', 'Others'];
+            const title = viewType === 'asset' ? 'Cumulative Fee Collection by Asset Over Time' : 'Cumulative Fee Collection by Source Blockchain Over Time';
+            const subtitle = viewType === 'asset' ? 'Total fees accumulated since August 1, 2025' : 'Total fees accumulated by source blockchain since August 1, 2025';
+            const colorPalette = viewType === 'asset' ? seriesColors : blockchainColors;
+
+            cumulativeChart.update({
+                title: { text: title },
+                subtitle: { text: subtitle },
+                series: seriesNames.map((name, index) => ({
+                    name: name,
+                    data: data[name],
+                    color: colorPalette[index % colorPalette.length]
+                }))
+            });
+        }
+
+        // Function to update asset bar chart
+        function updateAssetBarChart(viewType) {
+            const data = viewType === 'asset' ? assetData : blockchainData;
+            const title = viewType === 'asset' ? 'Total Fee Distribution by Asset' : 'Total Fee Distribution by Source Blockchain';
+            const subtitle = viewType === 'asset' ? 'All-time fees collected per asset' : 'All-time fees collected per source blockchain';
+            const colorPalette = viewType === 'asset' ? seriesColors : blockchainColors;
+
+            assetBarChart.update({
+                title: { text: title },
+                subtitle: { text: subtitle },
+                xAxis: { categories: data.map(item => item.name) },
+                series: [{
+                    name: 'Fees',
+                    data: data.map((item, index) => ({
+                        y: item.value,
+                        percentage: item.percentage,
+                        color: colorPalette[index % colorPalette.length]
+                    }))
+                }]
+            });
+        }
+
+        // Function to update top assets chart
+        function updateTopAssetsChart(viewType) {
+            const data = viewType === 'asset' ? dailyStackedData : dailyBlockchainData;
+            const seriesNames = viewType === 'asset' ? ['ETH', 'ZEC', 'BTC', 'USDC', 'Others'] : ['Ethereum', 'Bitcoin', 'Zcash', 'Solana', 'Others'];
+            const title = viewType === 'asset' ? 'Top 5 Assets Fee Collection Over Time' : 'Top 5 Source Blockchains Fee Collection Over Time';
+            const subtitle = viewType === 'asset' ? 'Daily breakdown of fees by top performing assets' : 'Daily breakdown of fees by source blockchains';
+            const colorPalette = viewType === 'asset' ? seriesColors : blockchainColors;
+
+            topAssetsChart.update({
+                title: { text: title },
+                subtitle: { text: subtitle },
+                series: seriesNames.map((name, index) => ({
+                    name: name,
+                    data: data.dates.map((date, i) => [new Date(date).getTime(), data[name][i]]),
+                    color: colorPalette[index % colorPalette.length]
+                }))
+            });
+        }
+
+        // Create Daily USD Fees Chart with Asset Breakdown
+        dailyChart = Highcharts.chart('dailyUSDChart', {
+            ...commonOptions,
+            chart: {
+                ...commonOptions.chart,
+                type: 'column'
+            },
+            title: {
+                text: 'Daily Fee Collection by Asset (USD)',
+                style: {
+                    fontSize: '1.8rem',
+                    fontWeight: '600',
+                    color: colors.navy
+                }
+            },
+            subtitle: {
+                text: 'Daily fees broken down by top assets',
+                style: {
+                    fontSize: '1.1rem',
+                    color: '#64748b'
+                }
+            },
+            xAxis: {
+                categories: dailyStackedData.dates.map(d => {
+                    const date = new Date(d);
+                    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                })
+            },
+            yAxis: {
+                title: {
+                    text: 'Fees (USD)'
+                },
+                labels: {
+                    format: '${value:,.0f}'
+                }
+            },
+            tooltip: {
+                formatter: function() {
+                    let total = 0;
+                    let breakdown = '<b>' + this.x + '</b><br/>';
+                    this.points.forEach(point => {
+                        total += point.y;
+                        if (point.y > 0) {
+                            breakdown += point.series.name + ': <b>$' + Highcharts.numberFormat(point.y, 2) + '</b><br/>';
+                        }
+                    });
+                    breakdown = '<b>Total: $' + Highcharts.numberFormat(total, 2) + '</b><br/>' + breakdown;
+                    return breakdown;
+                },
+                shared: true
+            },
+            plotOptions: {
+                column: {
+                    stacking: 'normal',
+                    borderRadius: 2,
+                    borderWidth: 0
+                }
+            },
+            series: [{
+                name: 'ETH',
+                data: dailyStackedData.ETH,
+                color: seriesColors[0]
+            }, {
+                name: 'ZEC',
+                data: dailyStackedData.ZEC,
+                color: seriesColors[1]
+            }, {
+                name: 'BTC',
+                data: dailyStackedData.BTC,
+                color: seriesColors[2]
+            }, {
+                name: 'USDC',
+                data: dailyStackedData.USDC,
+                color: seriesColors[3]
+            }, {
+                name: 'Others',
+                data: dailyStackedData.Others,
+                color: seriesColors[4]
+            }]
+        });
+
+        // Create Cumulative Chart with Asset Breakdown
+        cumulativeChart = Highcharts.chart('cumulativeChart', {
+            ...commonOptions,
+            chart: {
+                ...commonOptions.chart,
+                type: 'area'
+            },
+            title: {
+                text: 'Cumulative Fee Collection by Asset Over Time',
+                style: {
+                    fontSize: '1.8rem',
+                    fontWeight: '600',
+                    color: colors.navy
+                }
+            },
+            subtitle: {
+                text: 'Total fees accumulated since August 1, 2025',
+                style: {
+                    fontSize: '1.1rem',
+                    color: '#64748b'
+                }
+            },
+            xAxis: {
+                categories: cumulativeStackedData.dates.map(d => {
+                    const date = new Date(d);
+                    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                })
+            },
+            yAxis: {
+                title: {
+                    text: 'Cumulative Fees (USD)'
+                },
+                labels: {
+                    format: '${value:,.0f}'
+                }
+            },
+            tooltip: {
+                formatter: function() {
+                    let total = 0;
+                    let breakdown = '<b>' + this.x + '</b><br/>';
+                    this.points.forEach(point => {
+                        total += point.y;
+                        if (point.y > 0) {
+                            breakdown += point.series.name + ': <b>$' + Highcharts.numberFormat(point.y, 2) + '</b><br/>';
+                        }
+                    });
+                    breakdown = '<b>Total: $' + Highcharts.numberFormat(total, 2) + '</b><br/>' + breakdown;
+                    return breakdown;
+                },
+                shared: true
+            },
+            plotOptions: {
+                area: {
+                    stacking: 'normal',
+                    lineColor: '#ffffff',
+                    lineWidth: 1,
+                    marker: {
+                        lineWidth: 1,
+                        lineColor: '#ffffff',
+                        enabled: false
+                    }
+                }
+            },
+            series: [{
+                name: 'ETH',
+                data: cumulativeStackedData.ETH,
+                color: seriesColors[0]
+            }, {
+                name: 'ZEC',
+                data: cumulativeStackedData.ZEC,
+                color: seriesColors[1]
+            }, {
+                name: 'BTC',
+                data: cumulativeStackedData.BTC,
+                color: seriesColors[2]
+            }, {
+                name: 'USDC',
+                data: cumulativeStackedData.USDC,
+                color: seriesColors[3]
+            }, {
+                name: 'Others',
+                data: cumulativeStackedData.Others,
+                color: seriesColors[4]
+            }]
+        });
+
+        // Create Horizontal Bar Chart for Asset Distribution
+        const assetData = [
+            { name: 'ETH', value: 3711.28, percentage: 33.4 },
+            { name: 'ZEC (Zcash)', value: 2009.12, percentage: 18.1 },
+            { name: 'BTC', value: 1181.49, percentage: 10.6 },
+            { name: 'USDC', value: 662.91, percentage: 6.0 },
+            { name: 'USDT', value: 538.90, percentage: 4.9 },
+            { name: 'wNEAR', value: 365.08, percentage: 3.3 },
+            { name: 'DOGE', value: 270.45, percentage: 2.4 },
+            { name: 'DAI', value: 202.98, percentage: 1.8 },
+            { name: 'Others', value: 2161.94, percentage: 19.5 }
+        ];
+
+        // Blockchain distribution data
+        const blockchainData = [
+            { name: 'Ethereum', value: 4856.76, percentage: 43.7 },
+            { name: 'Bitcoin', value: 1181.49, percentage: 10.6 },
+            { name: 'Zcash', value: 2009.12, percentage: 18.1 },
+            { name: 'Solana', value: 662.91, percentage: 6.0 },
+            { name: 'Arbitrum', value: 538.90, percentage: 4.9 },
+            { name: 'Base', value: 365.08, percentage: 3.3 },
+            { name: 'Tron', value: 270.45, percentage: 2.4 },
+            { name: 'Polygon', value: 202.98, percentage: 1.8 },
+            { name: 'Others', value: 1007.46, percentage: 9.1 }
+        ];
+
+        assetBarChart = Highcharts.chart('assetBarChart', {
+            ...commonOptions,
+            chart: {
+                ...commonOptions.chart,
+                type: 'bar'
+            },
+            title: {
+                text: 'Total Fee Distribution by Asset',
+                style: {
+                    fontSize: '1.8rem',
+                    fontWeight: '600',
+                    color: colors.navy
+                }
+            },
+            subtitle: {
+                text: 'All-time fees collected per asset',
+                style: {
+                    fontSize: '1.1rem',
+                    color: '#64748b'
+                }
+            },
+            xAxis: {
+                categories: assetData.map(item => item.name),
+                title: {
+                    text: null
+                }
+            },
+            yAxis: {
+                min: 0,
+                title: {
+                    text: 'Total Fees (USD)',
+                    align: 'high'
+                },
+                labels: {
+                    format: '${value:,.0f}',
+                    overflow: 'justify'
+                }
+            },
+            tooltip: {
+                formatter: function() {
+                    return '<b>' + this.x + '</b><br/>' +
+                           'Total: <b>$' + Highcharts.numberFormat(this.y, 2) + '</b><br/>' +
+                           'Percentage: <b>' + this.point.percentage + '%</b>';
+                }
+            },
+            plotOptions: {
+                bar: {
+                    dataLabels: {
+                        enabled: true,
+                        format: '${point.y:,.0f} ({point.percentage}%)',
+                        style: {
+                            fontSize: '0.9rem'
+                        }
+                    },
+                    borderRadius: 4,
+                    colorByPoint: true
+                }
+            },
+            legend: {
+                enabled: false
+            },
+            series: [{
+                name: 'Fees',
+                data: assetData.map((item, index) => ({
+                    y: item.value,
+                    percentage: item.percentage,
+                    color: seriesColors[index % seriesColors.length]
+                }))
+            }]
+        });
+
+        // Create Top Assets Over Time Area Chart
+        topAssetsChart = Highcharts.chart('topAssetsTimeChart', {
+            ...commonOptions,
+            chart: {
+                ...commonOptions.chart,
+                type: 'area'
+            },
+            title: {
+                text: 'Top 5 Assets Fee Collection Over Time',
+                style: {
+                    fontSize: '1.8rem',
+                    fontWeight: '600',
+                    color: colors.navy
+                }
+            },
+            subtitle: {
+                text: 'Daily breakdown of fees by top performing assets',
+                style: {
+                    fontSize: '1.1rem',
+                    color: '#64748b'
+                }
+            },
+            xAxis: {
+                type: 'datetime',
+                labels: {
+                    format: '{value:%b %d}'
+                }
+            },
+            yAxis: {
+                title: {
+                    text: 'Daily Fees (USD)'
+                },
+                labels: {
+                    format: '${value}'
+                }
+            },
+            tooltip: {
+                split: true,
+                valueSuffix: ' USD'
+            },
+            plotOptions: {
+                area: {
+                    stacking: 'normal',
+                    lineColor: '#ffffff',
+                    lineWidth: 1,
+                    marker: {
+                        lineWidth: 1,
+                        lineColor: '#ffffff',
+                        enabled: false
+                    }
+                }
+            },
+            series: [{
+                name: 'ETH',
+                data: dailyStackedData.dates.map((date, i) => 
+                    [new Date(date).getTime(), dailyStackedData.ETH[i]]
+                ),
+                color: seriesColors[0]
+            }, {
+                name: 'ZEC',
+                data: dailyStackedData.dates.map((date, i) => 
+                    [new Date(date).getTime(), dailyStackedData.ZEC[i]]
+                ),
+                color: seriesColors[1]
+            }, {
+                name: 'BTC',
+                data: dailyStackedData.dates.map((date, i) => 
+                    [new Date(date).getTime(), dailyStackedData.BTC[i]]
+                ),
+                color: seriesColors[2]
+            }, {
+                name: 'USDC',
+                data: dailyStackedData.dates.map((date, i) => 
+                    [new Date(date).getTime(), dailyStackedData.USDC[i]]
+                ),
+                color: seriesColors[3]
+            }, {
+                name: 'Others',
+                data: dailyStackedData.dates.map((date, i) => 
+                    [new Date(date).getTime(), dailyStackedData.Others[i]]
+                ),
+                color: seriesColors[4]
+            }]
+        });
+    </script>
+</body>
+</html>
