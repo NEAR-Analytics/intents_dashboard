@@ -16,7 +16,7 @@ COPY pyproject.toml uv.lock ./
 
 # Create a local project venv and install locked deps (no BuildKit mounts)
 ENV UV_PROJECT_ENVIRONMENT=/app/.venv
-RUN uv sync --frozen --no-dev
+RUN uv sync --frozen
 
 # Copy application code
 COPY . .
