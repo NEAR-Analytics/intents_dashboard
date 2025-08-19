@@ -17,11 +17,11 @@ def _read_sql(path: str) -> str:
     except Exception:
         return ""
 
-@st.cache_data(show_spinner=False, ttl=300)
+@st.cache_data(show_spinner=False, ttl=43200)  # 12 hours = 43200 seconds
 def run_query_text(sql_text: str) -> pd.DataFrame:
     return get_fs_data(query_path=None, query_text=sql_text)
 
-@st.cache_data(show_spinner=False, ttl=300)
+@st.cache_data(show_spinner=False, ttl=43200)  # 12 hours = 43200 seconds
 def run_query_file(sql_path: str) -> pd.DataFrame:
     return get_fs_data(query_path=sql_path, query_text=None)
 
@@ -51,29 +51,25 @@ def create_kpi_metrics(summary_df):
     with col1:
         st.metric(
             label="Total Fees Collected (USD)",
-            value=format_currency(row.get('total_usd', 0)),
-            delta="All-time total"
+            value=format_currency(row.get('total_usd', 0))
         )
     
     with col2:
         st.metric(
             label="Total Transactions",
-            value=format_number(row.get('total_transactions', 0)),
-            delta="Fee collections"
+            value=format_number(row.get('total_transactions', 0))
         )
     
     with col3:
         st.metric(
             label="Unique Assets",
-            value=f"{int(row.get('unique_assets', 0))}+",
-            delta="Different tokens"
+            value=f"{int(row.get('unique_assets', 0))}+"
         )
     
     with col4:
         st.metric(
             label="Source Blockchains",
-            value=str(int(row.get('unique_chains', 0))),
-            delta="Chains integrated"
+            value=str(int(row.get('unique_chains', 0)))
         )
     
     with col5:
@@ -83,19 +79,22 @@ def create_kpi_metrics(summary_df):
             date_str = latest_date.split()[0]
         else:
             date_str = latest_date.strftime('%b %d, %Y')
+        # Display date as part of label instead of delta
         st.metric(
-            label="Today's Fees",
-            value=format_currency(today_usd),
-            delta=date_str
+            label=f"Today's Fees ({date_str})",
+            value=format_currency(today_usd)
         )
     
     with col6:
         top_asset = row.get('top_asset', 'N/A')
         top_asset_usd = row.get('top_asset_usd', 0)
+        # Display amount as part of value instead of delta
+        value_text = f"{top_asset}" if top_asset else "N/A"
+        if top_asset_usd > 0:
+            value_text += f" ({format_currency(top_asset_usd)})"
         st.metric(
             label="Top Asset",
-            value=top_asset if top_asset else "N/A",
-            delta=format_currency(top_asset_usd)
+            value=value_text
         )
 
 def prepare_daily_data(df: pd.DataFrame, view_type: str = 'asset'):
@@ -395,7 +394,7 @@ def main():
     <div style='text-align: center; padding: 2rem 0; background: linear-gradient(135deg, #1D4E89 0%, #00B2CA 100%); 
                 color: white; border-radius: 10px; margin-bottom: 2rem;'>
         <h1 style='margin: 0; font-size: 2.5rem;'>💰 NEAR Intents Fee Collection Dashboard</h1>
-        <p style='margin: 0.5rem 0 0 0; font-size: 1.2rem;'>Account: app-fee.near | Real-time Multichain Fee Analytics</p>
+        <p style='margin: 0.5rem 0 0 0; font-size: 1.2rem;'>Account: app-fee.near | Multichain Fee Analytics</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -410,6 +409,30 @@ def main():
             summary_df = pd.DataFrame()
             df_daily = pd.DataFrame()
             df_top = pd.DataFrame()
+    
+    # Display last available timestamp and refresh info
+    if not summary_df.empty:
+        # Use last_transaction for full timestamp, fallback to latest_date
+        last_timestamp = summary_df.iloc[0].get('last_transaction', summary_df.iloc[0].get('latest_date', ''))
+        
+        if pd.notna(last_timestamp):
+            if isinstance(last_timestamp, str):
+                timestamp_display = last_timestamp
+            else:
+                # Format as full timestamp with date and time
+                timestamp_display = last_timestamp.strftime('%B %d, %Y at %I:%M:%S %p UTC')
+        else:
+            timestamp_display = "Not available"
+        
+        col1, col2, col3 = st.columns([2, 2, 1])
+        with col1:
+            st.markdown(f"**Last Available Data:** {timestamp_display}")
+        with col2:
+            st.markdown("**Auto-refresh:** Every 12 hours")
+        with col3:
+            if st.button("🔄 Refresh Data", help="Clear cache and reload data"):
+                st.cache_data.clear()
+                st.rerun()
     
     # KPI Metrics
     st.header("📊 Summary Statistics")
@@ -533,37 +556,6 @@ def main():
     else:
         st.info("No asset data available")
     
-    # Insights Section
-    st.header("💡 Key Insights")
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.info("""
-        **🚀 Rapid Growth Trajectory**
-        
-        The app-fee.near account has demonstrated impressive fee collection capabilities, 
-        processing transactions across multiple blockchains. The daily average fee collection 
-        shows strong protocol usage and healthy fee generation.
-        """)
-    
-    with col2:
-        st.success("""
-        **💎 Diversified Fee Portfolio**
-        
-        Fees are collected across 35+ different assets from 15 blockchains. 
-        The top assets (ETH, ZEC, BTC) demonstrate significant value capture, 
-        while stablecoins provide stability.
-        """)
-    
-    with col3:
-        st.warning("""
-        **🌐 True Multichain Operations**
-        
-        NEAR Intents showcases exceptional cross-chain capabilities, processing fees from 
-        Ethereum, Bitcoin, Zcash, Solana, Arbitrum, Base, Tron, and other major chains.
-        """)
-    
     # SQL Query Viewer
     st.header("🔍 Technical Details")
     
@@ -584,7 +576,7 @@ def main():
     
     # Footer
     st.divider()
-    st.caption("Data Source: Flipside NEAR.DEFI.EZ_INTENTS | Updates every 5 minutes")
+    st.caption("Data Source: Flipside NEAR.DEFI.EZ_INTENTS | Cache refreshes every 12 hours")
     st.caption("Built with Streamlit & Snowflake | © 2025 NEAR Protocol")
 
 if __name__ == "__main__":
