@@ -5,6 +5,8 @@ import snowflake.connector
 import base64
 import re
 import textwrap
+import requests
+import json
 load_dotenv()
 
 # Snowflake connection parameters - JWT authentication
@@ -133,15 +135,78 @@ def _load_private_key_bytes_from_env() -> bytes | None:
     )
     return der_pkcs8
 
+def _try_rest_api_with_token(sql_query: str) -> pd.DataFrame:
+    """Try to execute query using Snowflake REST API with token"""
+    SNOWFLAKE_TOKEN = _get_config_value('SNOWFLAKE_TOKEN')
+    SNOWFLAKE_ACCOUNT = _get_config_value('SNOWFLAKE_ACCOUNT')
+    SNOWFLAKE_WAREHOUSE = _get_config_value('SNOWFLAKE_WAREHOUSE')
+    SNOWFLAKE_DATABASE = _get_config_value('SNOWFLAKE_DATABASE')
+    SNOWFLAKE_SCHEMA = _get_config_value('SNOWFLAKE_SCHEMA')
+    
+    if not all([SNOWFLAKE_TOKEN, SNOWFLAKE_ACCOUNT, SNOWFLAKE_WAREHOUSE, SNOWFLAKE_DATABASE]):
+        raise ValueError("Missing required parameters for REST API")
+    
+    # Snowflake REST API endpoint - try different URL formats
+    possible_urls = []
+    
+    if '.' in SNOWFLAKE_ACCOUNT:
+        # Format like "zsniary.flipside_pro" 
+        account_parts = SNOWFLAKE_ACCOUNT.split('.')
+        possible_urls = [
+            f"https://{account_parts[0]}-{account_parts[1]}.snowflakecomputing.com",  # zsniary-flipside_pro
+            f"https://{account_parts[0]}.{account_parts[1]}.snowflakecomputing.com",   # zsniary.flipside_pro
+            f"https://app.snowflake.com/{account_parts[0]}/{account_parts[1]}",        # app.snowflake.com format
+        ]
+    else:
+        possible_urls = [f"https://{SNOWFLAKE_ACCOUNT}.snowflakecomputing.com"]
+    
+    base_url = possible_urls[0]  # Start with first option
+    
+    headers = {
+        'Authorization': f'Bearer {SNOWFLAKE_TOKEN}',
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+    }
+    
+    # Try to execute query using REST API
+    payload = {
+        'statement': sql_query,
+        'warehouse': SNOWFLAKE_WAREHOUSE,
+        'database': SNOWFLAKE_DATABASE,
+        'schema': SNOWFLAKE_SCHEMA
+    }
+    
+    response = requests.post(
+        f"{base_url}/api/v2/statements",
+        headers=headers,
+        json=payload,
+        timeout=30
+    )
+    
+    if response.status_code == 200:
+        result = response.json()
+        # Extract data from REST API response and convert to DataFrame
+        if 'data' in result and result['data']:
+            columns = [col['name'].lower() for col in result['resultSetMetaData']['rowType']]
+            data = result['data']
+            return pd.DataFrame(data, columns=columns)
+        else:
+            return pd.DataFrame()
+    else:
+        raise Exception(f"REST API failed: {response.status_code} - {response.text}")
+
 def get_snowflake_connection():
     """Create and return a Snowflake connection using JWT authentication"""
-    # Validate required env vars (excluding key file which we resolve below)
+    # Get required configuration
     SNOWFLAKE_USER = _get_config_value('SNOWFLAKE_USER')
     SNOWFLAKE_ACCOUNT = _get_config_value('SNOWFLAKE_ACCOUNT')
     SNOWFLAKE_WAREHOUSE = _get_config_value('SNOWFLAKE_WAREHOUSE')
     SNOWFLAKE_DATABASE = _get_config_value('SNOWFLAKE_DATABASE')
     SNOWFLAKE_SCHEMA = _get_config_value('SNOWFLAKE_SCHEMA')
-
+    SNOWFLAKE_AUTHENTICATOR = _get_config_value('SNOWFLAKE_AUTHENTICATOR')
+    SNOWFLAKE_PRIVATE_KEY_B64 = _get_config_value('SNOWFLAKE_PRIVATE_KEY_B64')
+    
+    # Validate required vars
     required_vars = {
         'SNOWFLAKE_USER': SNOWFLAKE_USER,
         'SNOWFLAKE_ACCOUNT': SNOWFLAKE_ACCOUNT,
@@ -152,13 +217,47 @@ def get_snowflake_connection():
     if missing_vars:
         raise ValueError(f"Missing required environment variables: {', '.join(missing_vars)}")
 
-    # First, prefer key contents from env if provided
+    # Handle base64 encoded private key
+    if SNOWFLAKE_PRIVATE_KEY_B64:
+        try:
+            # Clean up the base64 string (remove quotes and whitespace)
+            b64_key = SNOWFLAKE_PRIVATE_KEY_B64.strip().strip('"')
+            
+            # Decode base64 to get PEM content
+            pem_bytes = base64.b64decode(b64_key)
+            
+            # Parse the PEM content to get DER PKCS8 bytes
+            from cryptography.hazmat.primitives import serialization
+            private_key = serialization.load_pem_private_key(pem_bytes, password=None)
+            der_pkcs8 = private_key.private_bytes(
+                encoding=serialization.Encoding.DER,
+                format=serialization.PrivateFormat.PKCS8,
+                encryption_algorithm=serialization.NoEncryption(),
+            )
+            
+            # Use the DER key bytes for connection
+            base_params = {
+                'account': SNOWFLAKE_ACCOUNT,
+                'user': SNOWFLAKE_USER,
+                'authenticator': SNOWFLAKE_AUTHENTICATOR or 'SNOWFLAKE_JWT',
+                'private_key': der_pkcs8,
+                'warehouse': SNOWFLAKE_WAREHOUSE,
+                'database': SNOWFLAKE_DATABASE,
+                'schema': SNOWFLAKE_SCHEMA
+            }
+            
+            return snowflake.connector.connect(**base_params)
+            
+        except Exception as e:
+            print(f"Base64 key authentication failed: {e}")
+            
+    # Try key contents from env variables
     key_bytes = _load_private_key_bytes_from_env()
     if key_bytes is not None:
         base_params = {
             'account': SNOWFLAKE_ACCOUNT,
             'user': SNOWFLAKE_USER,
-            'authenticator': 'SNOWFLAKE_JWT',
+            'authenticator': SNOWFLAKE_AUTHENTICATOR or 'SNOWFLAKE_JWT',
             'private_key': key_bytes,
             'warehouse': SNOWFLAKE_WAREHOUSE,
             'database': SNOWFLAKE_DATABASE,
@@ -166,46 +265,30 @@ def get_snowflake_connection():
         }
         return snowflake.connector.connect(**base_params)
 
-    # Otherwise fall back to resolving a key file path
+    # Try key file path
     key_path = _resolve_private_key_path()
-    if not key_path:
-        raise FileNotFoundError(
-            "Snowflake private key not provided. Set PRIVATE_KEY_PEM with raw PEM (preferred), "
-            "or SNOWFLAKE_PRIVATE_KEY / SNOWFLAKE_PRIVATE_KEY_B64, or set "
-            "SNOWFLAKE_PRIVATE_KEY_FILE to a valid path, or place 'rsa_key.p8' or "
-            "'rsa_key_nopass.p8' in the project directory."
-        )
+    if key_path:
+        base_params = {
+            'account': SNOWFLAKE_ACCOUNT,
+            'user': SNOWFLAKE_USER,
+            'authenticator': SNOWFLAKE_AUTHENTICATOR or 'SNOWFLAKE_JWT',
+            'private_key_file': key_path,
+            'warehouse': SNOWFLAKE_WAREHOUSE,
+            'database': SNOWFLAKE_DATABASE,
+            'schema': SNOWFLAKE_SCHEMA
+        }
+        return snowflake.connector.connect(**base_params)
 
-    # Build connection parameters for JWT authentication
-    base_params = {
-        'account': SNOWFLAKE_ACCOUNT,
-        'user': SNOWFLAKE_USER,
-        'authenticator': 'SNOWFLAKE_JWT',
-        'private_key_file': key_path,
-        'warehouse': SNOWFLAKE_WAREHOUSE,
-        'database': SNOWFLAKE_DATABASE,
-        'schema': SNOWFLAKE_SCHEMA
-    }
-
-    # If password provided, try with it first; on TypeError for unencrypted key, retry without
-    SNOWFLAKE_PRIVATE_KEY_PWD = _get_config_value('SNOWFLAKE_PRIVATE_KEY_PWD')
-    if SNOWFLAKE_PRIVATE_KEY_PWD:
-        try:
-            return snowflake.connector.connect(
-                **{**base_params, 'private_key_file_pwd': SNOWFLAKE_PRIVATE_KEY_PWD}
-            )
-        except TypeError as e:
-            msg = str(e).lower()
-            if 'not encrypted' in msg or 'unencrypted' in msg:
-                # Retry without password
-                return snowflake.connector.connect(**base_params)
-            raise
-
-    return snowflake.connector.connect(**base_params)
+    raise FileNotFoundError(
+        "No authentication method available. Provide either:\n"
+        "1. SNOWFLAKE_PRIVATE_KEY_B64 (base64 encoded private key), or\n"
+        "2. SNOWFLAKE_PRIVATE_KEY_FILE (path to private key file), or\n"
+        "3. PRIVATE_KEY_PEM (raw PEM content)"
+    )
 
 def get_fs_data(query_path, query_text=None, page_number=1, page_size=1):
     """
-    Execute a SQL query using Snowflake connection instead of Flipside API
+    Execute a SQL query using Snowflake connection or REST API
     
     Args:
         query_path: Path to SQL file containing the query
@@ -221,7 +304,7 @@ def get_fs_data(query_path, query_text=None, page_number=1, page_size=1):
         with open(query_path, 'r') as f:
             query_text = f.read()
     
-    # Connect to Snowflake and execute query
+    # Use Python connector with RSA key authentication
     conn = get_snowflake_connection()
     cur = conn.cursor()
     

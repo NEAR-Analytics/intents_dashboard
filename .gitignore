@@ -8,9 +8,49 @@ wheels/
 
 # Virtual environments
 .venv
+venv/
+env/
+ENV/
+intents-fees/
 
 # Local environment files
 .env
+.env.local
 
+# Private keys and credentials
+rsa_key*.p8
+rsa_key*.pub
+*.pem
+*.key
 
-rsa_key_nopass.p8
+# Test files
+test_*.py
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Claude AI files
+.claude/
+
+# Example/demo files
+example-*/
+example-near-intents-fees/
+near-intents-fees-dashboard.html
+*.html
+
+# Jupyter notebooks
+*.ipynb_checkpoints/
+
+# Logs
+*.log
+
+# Database
+*.db
+*.sqlite3
